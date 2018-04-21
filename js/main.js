@@ -284,7 +284,6 @@ function addFavo(messageId, message) {
         console.log(messageFav.message.text);
         $div.find(".favo__icon").attr("class","favo__icon glyphicon glyphicon-star");
         console.log("favo");
-        
       }
       
   });
