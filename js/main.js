@@ -147,7 +147,6 @@ function clearNavbar() {
 // チャット画面の初期化処理
 function loadChatView() {
   resetChatView();
-
   dbdata = {}; // キャッシュデータを空にする
 
   // ユーザ一覧を取得してさらに変更を監視
@@ -180,9 +179,9 @@ function loadChatView() {
       updateNicknameDisplay(uid);
       downloadProfileImage(uid);
     }
-
+    
     // usersとroomsが揃ったらルームを表示（初回のみ）
-    if (currentRoomName === null && dbdata.rooms) {
+    if (currentRoomName === null && dbdata.users) {
       showCurrentRoom();
     }
   });
@@ -208,26 +207,28 @@ function loadChatView() {
       // このコールバック関数が再度呼ばれるのでこれ以上は処理しない
       return;
     }
-
+    dbdata.rooms[currentUID] = currentUID;
     // ルーム一覧をナビゲーションメニューに表示
-    showRoomList(roomsSnapshot);
+    showRoomList(roomsSnapshot, currentUID);
 
-    // usersデータがまだ来ていない場合は何もしない
-    if (!dbdata.users) {
-      return;
-    }
-
-    showCurrentRoom();
   });
+      // usersデータがまだ来ていない場合は何もしない
+  if (!dbdata.users) {
+    return;
+  }
+
+  showCurrentRoom();
+    
 }
 
 // 動的に追加されたルームを一旦削除する
 function clearRoomList() {
   $(".room-list").find(".room-list-dynamic").remove();
+  $(".favo-list").find(".favo-list__link").remove();
 }
 
 // ルーム一覧をナビゲーションメニュー内に表示する
-function showRoomList(roomsSnapshot) {
+function showRoomList(roomsSnapshot, currentUID) {
   // 動的に追加されたルームを一旦削除する
   clearRoomList();
 
@@ -246,6 +247,15 @@ function showRoomList(roomsSnapshot) {
       // ハンバーガーメニューが開いている場合は閉じる
       $("#navbar").collapse("hide");
     });
+  });
+
+  $a = $("<a>",{
+    href: "#" + currentUID,
+    class: "favo-list__link",
+  }).text("お気に入り一覧");
+  $(".favo-list").append($a);
+  $a.click(function(){
+    $("#navbar").collapse("hide");
   });
 }
 
@@ -322,7 +332,7 @@ function createMessageDiv(messageId, message) {
   // id属性をセット
   $div.attr("id", "message-id-" + messageId);
   
-  $div.find(".favo__submit").attr("onclick", "favoMessage('"  + messageId  + "','" + currentRoomName + "','" + currentUID + "'); return false;");
+  $div.find(".favo__submit").attr("onclick", "favoMessage('"  + messageId  + "','" + currentRoomName + "','" + currentUID + "');return false;");
 
   console.log(messageId);
   return $div;
@@ -392,24 +402,37 @@ function _showRoom(roomName) {
   }
   currentRoomName = roomName;
   clearMessages();
-
   // ルームのメッセージ一覧をダウンロードし、かつメッセージの追加を監視
-  var roomRef = firebase.database().ref("messages/" + roomName).limitToLast(100);
+  if(roomName === currentUID){
+    $(".comment-form").toggle(false);
+    var roomRef = firebase.database().ref("favorites/" + currentUID).limitToLast(100);
+  }else {
+    $(".comment-form").toggle(true);
+    var roomRef = firebase.database().ref("messages/" + roomName).limitToLast(100);
+  }
   // 過去に登録したイベントハンドラを削除
   roomRef.off("child_added");
   // イベントハンドラを登録
   roomRef.on("child_added", function(childSnapshot, prevChildKey) {
+    var messageID = childSnapshot.key;
+    var message = childSnapshot.val();
+    if(roomName === currentUID){
+      message = childSnapshot.val().message;
+    }
     if (roomName === currentRoomName) {
       // 追加されたメッセージを表示
-      addMessage(childSnapshot.key, childSnapshot.val());
-      addFavo(childSnapshot.key, childSnapshot.val());
+      addMessage(messageID, message);
+      addFavo(messageID, message);
     }
   });
   
 
   // ナビゲーションバーのルーム表示を更新
-  $(".room-list-menu").text("ルーム: " + roomName);
-
+  if(roomName === currentUID) {
+    $(".room-list-menu").text("ルーム: お気に入り");
+  }else {
+    $(".room-list-menu").text("ルーム: " + roomName);
+  }
   // 初期ルームの場合はルーム削除メニューを無効にする
   if (roomName === defaultRoomName) {
     $(".delete-room-menuitem").addClass("disabled");
@@ -581,26 +604,28 @@ $(document).ready(function() {
 
   // .message-listの高さを調整
   setMessageListMinHeight();
-
-  $(".comment-form").submit(function() {
-    $text = $(".comment-form__text");
-    var comment = $text.val();
-    if (comment === "") {
-      return false;
-    }
-    $text.val("");
-
-    // TODO: メッセージを投稿する
-    var message = {
-      uid: currentUID,
-      text: comment,
-      time: firebase.database.ServerValue.TIMESTAMP,
-    };
-    firebase.database().ref().child("messages/" + currentRoomName).push(message);
-
-    return false;
-  });
-
+  if(currentRoomName !== currentUID){
+      $(".comment-form").submit(function() {
+        $text = $(".comment-form__text");
+        var comment = $text.val();
+        if (comment === "") {
+          return false;
+        }
+        $text.val("");
+      
+        // TODO: メッセージを投稿する
+        var message = {
+          uid: currentUID,
+          text: comment,
+          time: firebase.database.ServerValue.TIMESTAMP,
+        };
+        firebase.database().ref().child("messages/" + currentRoomName).push(message);
+      
+        return false;
+      });
+  }
+  
+ 
   /**
    * パスワードリセット関連
    */
