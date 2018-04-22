@@ -405,7 +405,7 @@ function _showRoom(roomName) {
   // ルームのメッセージ一覧をダウンロードし、かつメッセージの追加を監視
   if(roomName === currentUID){
     $(".comment-form").toggle(false);
-    var roomRef = firebase.database().ref("favorites/" + currentUID).limitToLast(100);
+    var roomRef = firebase.database().ref("favorites/" + currentUID).limitToLast(100).orderByChild("createdAt");
   }else {
     $(".comment-form").toggle(true);
     var roomRef = firebase.database().ref("messages/" + roomName).limitToLast(100);
